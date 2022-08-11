@@ -26,7 +26,7 @@ export const plugin = new PanelPlugin<TreeOptions>(TreePanel).setPanelOptions((b
       path: 'treeFields',
       name: 'Tree level definitions',
       description: 'Separated by endline. Use Serie varible name in order to take difference several series',
-      defaultValue: '${field_1} ${field_2}\n${field_3}',
+      defaultValue: '',
       settings: {
         rows: 5,
         useTextarea: true,

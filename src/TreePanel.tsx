@@ -39,6 +39,8 @@ const getStyles = (theme: GrafanaTheme2) => ({
   `,
 });
 
+const enableConsoleLog = true;
+
 export const TreePanel: FC<Props> = ({ options, data, width, height }) => {
   Handlebars.registerHelper('printPodColumn', printPodColumn);
 
@@ -68,7 +70,7 @@ export const TreePanel: FC<Props> = ({ options, data, width, height }) => {
   } else {
     addSerieColumn(options.serieColumn, data);
     dataItems = buildTreeData(options, data.series);
-    if (options.enableConsoleLog) {
+    if (enableConsoleLog) {
       console.log(stringTree(dataItems, '', false));
     }
   }
@@ -159,7 +161,6 @@ function addSerieColumn(columnName: string, data: PanelData) {
 
 function buildTreeData(options: TreeOptions, series: DataFrame[]) {
   const name = options.rootName;
-  const treeFields = options.treeFields.split('\n');
   const rootId = 'R';
   let rows: DataItem[] = [];
   series.forEach((serie) => {
@@ -174,8 +175,24 @@ function buildTreeData(options: TreeOptions, series: DataFrame[]) {
     values: new Map<string, string>(),
   };
 
+  let optionalTreeFields = options.treeFields;
+  if (optionalTreeFields === undefined || optionalTreeFields === null) {
+    optionalTreeFields = '';
+  }
+  var treeFields = optionalTreeFields.split('\n');
+  if (optionalTreeFields === '') {
+    treeFields = [];
+    series[0].fields.forEach((field) => {
+      if (!field.name.includes('serieColumn')) {
+        treeFields.push('${' + field.name + '}');
+      }
+    });
+  }
+  if (enableConsoleLog) {
+    console.log(treeFields);
+  }
   childrenByField(rootItem, options, treeFields);
-  if (options.enableConsoleLog) {
+  if (enableConsoleLog) {
     console.log(JSON.stringify(rootItem, jsonMapReplacer));
   }
 
@@ -189,14 +206,16 @@ function childrenByField(item: DataItem, options: TreeOptions, treeFields: strin
     let itemIdx = 0;
     item.rows.forEach((child) => {
       const key = evalTemplate(options.treeFieldTemplateEngine, treeField, child.values);
-      const childId = item.id + idSep + correctId(key) + idSep + String(itemIdx++);
-      item.groups.set(key, {
-        id: childId,
-        text: key,
-        rows: [],
-        groups: new Map<string, DataItem>(),
-        values: child.values,
-      });
+      if (key !== '') {
+        const childId = item.id + idSep + correctId(key) + idSep + String(itemIdx++);
+        item.groups.set(key, {
+          id: childId,
+          text: key,
+          rows: [],
+          groups: new Map<string, DataItem>(),
+          values: child.values,
+        });
+      }
     });
     item.rows = [];
 
@@ -206,23 +225,28 @@ function childrenByField(item: DataItem, options: TreeOptions, treeFields: strin
   let itemIdx = 0;
   item.rows.forEach((child) => {
     const key = evalTemplate(options.treeFieldTemplateEngine, treeField, child.values);
-    const childId = item.id + idSep + correctId(key) + idSep + String(itemIdx++);
-    if (!item.groups.has(key)) {
-      item.groups.set(key, {
-        id: childId,
-        text: key,
-        rows: [],
-        groups: new Map<string, DataItem>(),
-        values: new Map<string, string>(),
-      });
-    }
+    if (key !== '') {
+      const childId = item.id + idSep + correctId(key) + idSep + String(itemIdx++);
+      if (!item.groups.has(key)) {
+        item.groups.set(key, {
+          id: childId,
+          text: key,
+          rows: [],
+          groups: new Map<string, DataItem>(),
+          values: new Map<string, string>(),
+        });
+      }
 
-    item.groups.get(key)!.rows.push(child);
+      item.groups.get(key)!.rows.push(child);
+    }
   });
 
   item.groups.forEach((child) => {
     if (options.showItemCount) {
       child.text += ' (' + child.rows.length + ')';
+    }
+    if (enableConsoleLog) {
+      console.log(child.rows);
     }
     childrenByField(child, options, treeFields.slice(1));
   });
